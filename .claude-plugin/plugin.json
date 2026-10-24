@@ -1,0 +1,13 @@
+{
+  "name": "prompt-calibrator",
+  "displayName": "Prompt Calibrator",
+  "version": "1.0.0",
+  "description": "Pre-flight requirement calibration: ground in context, ask at most 3 high-value questions, and turn a vague request into a short, verifiable brief before long, multi-agent, or irreversible work.",
+  "author": {
+    "name": "Prompt Calibrator contributors"
+  },
+  "homepage": "https://github.com/khu88/prompt-calibrator#readme",
+  "repository": "https://github.com/khu88/prompt-calibrator",
+  "license": "MIT",
+  "keywords": ["requirements", "clarification", "prompt", "planning", "multi-agent", "spec"]
+}

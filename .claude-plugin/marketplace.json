@@ -1,0 +1,14 @@
+{
+  "name": "prompt-calibrator",
+  "owner": {
+    "name": "Prompt Calibrator contributors"
+  },
+  "description": "Pre-flight requirement calibration for AI coding and research agents.",
+  "plugins": [
+    {
+      "name": "prompt-calibrator",
+      "source": "./",
+      "description": "Skill, read-only subagent, and prompt hook that clarify a task before an agent starts on it."
+    }
+  ]
+}
