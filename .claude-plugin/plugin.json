@@ -1,8 +1,8 @@
 {
   "name": "prompt-calibrator",
   "displayName": "Prompt Calibrator",
-  "version": "1.0.0",
-  "description": "Pre-flight requirement calibration: ground in context, ask at most 3 high-value questions, and turn a vague request into a short, verifiable brief before long, multi-agent, or irreversible work.",
+  "version": "1.1.0",
+  "description": "Lightweight task clarification: read context, resolve consequential gaps, respect authorization, and record a short brief when useful.",
   "author": {
     "name": "Prompt Calibrator contributors"
   },

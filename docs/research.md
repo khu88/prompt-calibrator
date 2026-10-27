@@ -1,19 +1,26 @@
-# Design Rationale: Research and Prior Art
+# Design Rationale: Research Notes and Current Choices
 
-Updated 2026-10-13. Covers Claude Code, Codex, and other agent harnesses.
+Current design updated 2026-10-28. Source notes in sections 1–6 and the reference list are retained from the 2026-10-13 document; bibliographic details, numbers, and publication status were not reverified during this simplification. Their historical design notes describe earlier reasoning, not the current runtime instructions. Consult the primary sources before citing those claims.
 
-This document records the evidence behind each design decision in `prompt-calibrator`. Use it when you change the skill. The agent never needs it at runtime.
+This document is optional background, not a runtime checklist. The current behavior is defined in [SKILL.md](../skills/prompt-calibrator/SKILL.md). No end-to-end evaluation results for Prompt Calibrator are reported here.
 
-## Summary
+## Current design summary
 
-1. **Underspecified instructions are a major cause of failure in long agent runs, and the cost grows with run length.** Given a vague instruction, agents guess rather than ask.
-2. **What works is separating underspecification detection from execution and doing it once, up front.** The agent answers what it can from context, asks a few high-value questions with recommended answers, fills the rest with explicit assumptions, and produces a verifiable spec (the brief).
-3. **Asking too much and asking too little both cost something.** The amount of questioning should adapt to impact × uncertainty × irreversibility. An irreversible action with an uncertain target always needs confirmation.
-4. **Multi-agent work also has to be calibrated between agents.** A sub-brief must carry the decisions already made and the interface contracts. Underspecified plans from the planner are otherwise a leading cause of failure.
+- Read the available context before asking. Check goal/deliverable, target/scope, constraints/authorization, and completion/verification.
+- Ask about unresolved gaps that materially change correctness, scope, or the intended result. Usually collect 0–3 necessary questions together; never fill a quota. Complexity alone does not require a question or approval.
+- Continue with explicit low-risk assumptions within existing authorization. Do not guess a high-impact missing fact or treat silence as approval. Respect user-defined checkpoints and pause only dependent work.
+- Record a short brief only when useful; reuse existing project records. Delegate with the necessary context, decisions, boundaries, interfaces, and acceptance checks. A scout may gather evidence, but does not duplicate the main agent's brief.
+- The keyword hook is an optional reminder. Its scoring algorithm is unchanged by this simplification and is separate from the agent's decision to ask.
+
+These are design choices to be evaluated, not effects established by the studies below. The earlier numerical question score, mandatory full brief approval, repeated constraints, and fixed failure-count pause are no longer runtime rules.
+
+## Historical source notes
+
+The following study summaries and their original design implications are preserved for traceability. They neither validate this implementation nor prescribe its current workflow.
 
 ## 1. The problem: underspecification makes agents guess
 
-| Study | Finding | Design implication |
+| Study | Recorded finding | Historical design note |
 |---|---|---|
 | Laban et al. 2025, *LLMs Get Lost in Multi-Turn Conversation* | Across 200,000+ simulated conversations, top LLMs average a 39% drop when requirements arrive over several turns instead of one. The drop comes mostly from a large rise in unreliability, not lost aptitude: models commit to early assumptions and don't recover. | Collect the spec before the first action, in one round. |
 | Ji et al. 2026, *Coding Agents Are Guessing* (UnderSpecBench) | 2,208 DevOps instruction variants run on Claude Code, Codex, and OpenCode. Between 55.8% and 67.8% of runs cross at least one action boundary. Underspecification mainly makes agents guess rather than fail. An uncertain target sharply degrades action quality, and blast-radius cues barely reduce the urge to act. | Require confirmation for irreversible actions with uncertain targets; don't count on the model to hold back. |
@@ -26,7 +33,7 @@ This document records the evidence behind each design decision in `prompt-calibr
 
 ## 2. Asking pays off
 
-| Study | Finding | Design implication |
+| Study | Recorded finding | Historical design note |
 |---|---|---|
 | Vijayvargiya et al., Ambig-SWE (ICLR 2026) | On underspecified SWE-bench Verified, interaction improves results by up to 74%. Models struggle to tell underspecified instructions from well-specified ones. | Add an explicit "is this underspecified?" step. |
 | Edwards & Schuster 2026, *Ask or Assume?* (EMNLP 2026) | A scaffold that separates underspecification detection from code execution resolves 69.40% of underspecified SWE-bench tasks, closing the gap to fully specified instructions. Its questioning is well calibrated: few questions on simple tasks, more on complex ones. | Use a dedicated calibrator (this skill or the scout subagent), not the executor in passing. |
@@ -37,7 +44,7 @@ This document records the evidence behind each design decision in `prompt-calibr
 
 ## 3. What to ask, and how much
 
-| Study | Finding | Design implication |
+| Study | Recorded finding | Historical design note |
 |---|---|---|
 | Kuhn et al. 2022, CLAM | Asking only on ambiguous inputs improves accuracy on mixed datasets. | Ask selectively, not always. |
 | Ren et al. 2023, KnowNo | Conformal prediction asks for help only when more than one candidate plan remains, minimizing help requests while guaranteeing success rates. | Ask only when the reasonable readings aren't unique. |
@@ -50,7 +57,7 @@ This document records the evidence behind each design decision in `prompt-calibr
 
 ## 4. Eliciting intent with little user effort
 
-| Study | Finding | Design implication |
+| Study | Recorded finding | Historical design note |
 |---|---|---|
 | Li et al. 2023, GATE | Model-generated questions elicit more information with less user effort than users writing prompts themselves, and surface considerations users hadn't thought of. | The agent asks; the user doesn't have to write a long prompt. |
 | Qian et al. 2024, IN3 | An upstream model judges task vagueness, asks about intent, and turns the answers into actionable goals before execution starts, which improves understanding and cuts redundant tool use. | Produce a goal summary the user can confirm (the brief). |
@@ -69,7 +76,7 @@ This document records the evidence behind each design decision in `prompt-calibr
 
 ## 6. Prior art
 
-| Project or guide | Mechanism | What this skill adopted |
+| Project or guide | Recorded mechanism | Historical design note |
 |---|---|---|
 | GitHub Spec Kit | Specs mark high-impact items that lack a reasonable default as `[NEEDS CLARIFICATION]`, at most 3. The clarify step scans coverage by category (Clear/Partial/Missing), picks questions by impact × uncertainty, asks at most 5 per session as multiple choice with a recommendation, and writes answers back into the spec. | Coverage scan, multiple choice with a recommendation, answers written back into the brief. |
 | Kiro Specs | Requirements use EARS syntax (WHEN … THE SYSTEM SHALL …). "Analyze requirements" flags vague terms, conflicting constraints, unstated assumptions, and missing edge cases. | Vague-term table, contradiction check. |
@@ -81,45 +88,49 @@ This document records the evidence behind each design decision in `prompt-calibr
 | Cursor Plan Mode, Cline Plan/Act, Roo Code `ask_followup_question`, Aider architect mode | Planning separated from execution; question tools offer 2–4 suggested answers. | Question format, read-only grounding phase. |
 | DSPy/GEPA, TextGrad, promptfoo | Offline, metric-driven prompt optimization and evaluation. | Regression-testing and tuning the skill itself (section 8), not runtime calibration. |
 
-## 7. Design decisions and their evidence
+## 7. Current design choices and rationale
 
-| Decision in the skill | Evidence |
-|---|---|
-| L0/L1/L2 triage; escalate when unsure | superpowers task classes; Claude Code's one-sentence-diff rule; BMAD's size-based planning |
-| Ground before asking | Ambig-SWE, HumanEvalComm (models neither ask nor look); "answerable from the code" listed as a bad question |
-| 12-dimension checklist, with focus on done criteria, target certainty, implicit requirements, and contradictions | Spec Kit categories; UnderSpecBench (target certainty); SWE-RPG (implicit requirements); Codex guide (contradictions) |
-| Divergence test decides ask or assume | ClarifyGPT consistency check; KnowNo's ask-only-when-several-plans rule |
-| Rank by impact × uncertainty × irreversibility; at most 3 questions | Uncertainty of Thoughts, SAGE-Agent (value of information); Spec Kit (impact × uncertainty, 3–5 cap) |
-| Multiple choice with a recommendation and a default | Spec Kit; Roo Code; GATE (less user effort) |
-| One round of questions | Laban et al. (39% drop from piecemeal requirements) |
-| Explicit Assumptions list | *What Prompts Don't Say* (inferred requirements are fragile and need to be correctable) |
-| Mandatory confirmation for irreversible actions with uncertain targets; most conservative default | UnderSpecBench; Codex guide's per-tool thresholds |
-| Calibrate in both directions; never invent questions | Ambig-DS; CLAM; *Ask or Assume?* (few questions on simple tasks) |
-| Brief of about 400 words, red lines at top and end | *Lost in the Middle*; *Context Rot*; *What Prompts Don't Say* (longer requirement lists aren't better) |
-| Restate before executing; L2 confirmation | *Rephrase and Respond*; IN3; Claude Code's SPEC.md workflow |
-| Sub-briefs carry decisions and interface contracts | Anthropic multi-agent post; Cognition; MAST; Planner-Coder Gap |
-| Re-calibration triggers during execution | Manus (recitation, keeping errors); Spec Kit's deferred items |
-| Non-interactive mode: defaults, no irreversible actions, questions in the report | Codex guide (don't stop unless blocked); UnderSpecBench (agents act on guesses) |
-| Only the user's replies count as answers | ASPI |
-| minimal / normal / thorough levels | *Steerable Clarification Policies* (cost-conditioned behavior) |
-| Separate read-only scout subagent | *Ask or Assume?* (detection separated from execution) |
+The source connections below explain where ideas came from. They do not establish that these exact rules, limits, or templates improve task performance.
+
+| Current choice | Rationale and source connection | What remains unverified |
+|---|---|---|
+| Read context before asking | Earlier notes connect this to Ambig-SWE, HumanEvalComm, and project-guidance conventions. | Whether this implementation avoids redundant questions in realistic projects. |
+| Four concise checks, without numerical gap scoring | Consolidates goal, target, constraints, authorization, and verification while retaining relevant implicit requirements and conflicts. | Whether the shorter checklist misses consequential requirements. |
+| Ask when reasonable interpretations lead to materially different outcomes | Related to the ambiguity checks discussed in ClarifyGPT and KnowNo. | The model's ability to recognize those differences reliably. |
+| Usually 0–3 necessary questions together; follow up on new consequential gaps or answers that leave one unresolved | Treats user effort as a cost, as discussed in the clarification work above; the usual batch size is a product choice, not a reason to omit an essential gap. | The best question budget. The cited multi-turn studies do not prove one round is always optimal. |
+| Preserve existing authorization; obtain missing authorization or correctness-critical answers | Separates work size from permission and uncertainty. Target/scope concerns appear in the UnderSpecBench notes. | Prompt-level compliance; the skill and hook are not enforcement controls. |
+| Use short records only when useful | Keeps consequential decisions and assumptions available without requiring a fixed length or duplicated constraints. Related context concerns appear in the notes above. | Whether the brief improves recovery or reduces errors. |
+| Delegate with sufficient context and clear boundaries; scout is optional | Related to Anthropic's delegation guidance, MAST, and Planner-Coder Gap. | Whether a separate scout adds value over direct grounding at comparable cost. |
+| Resolve routine failures within scope; pause dependent work for material changes or missing approval | Avoids turning an arbitrary retry count into a user question. | Whether the agent correctly distinguishes routine recovery from scope or correctness changes. |
+| Only direct user authorization counts | Preserves the trust boundary discussed in the ASPI notes. | Resistance to injection in actual agent runs. |
 
 ## 8. Evaluating the skill
 
-Build a small internal set of 30–60 real past instructions, stratified by L0/L1/L2 and by whether they include irreversible actions. Run each with the skill on and off, and compare:
+Start with a static consistency review: check that the skill, adapter, scout, hook message, templates, and examples agree. Representative cases should include:
 
-- **Effectiveness:** resolve or acceptance rate; boundary-violation rate, using UnderSpecBench's Wrong Target and OverScope categories; share of first deliverables the user accepts.
-- **Efficiency:** questions per task, user answer time, total time and tokens, rework rounds (compare SWE-chat's pushback rate).
-- **Calibration quality:** over-asking rate (L0 tasks that got questions), under-asking rate (high-impact gaps found later that weren't asked about), and the share of assumptions later overturned.
+- A clear, authorized long or parallel task proceeds without extra approval.
+- A question answered by project files is resolved from those files.
+- A missing fact that changes correctness or the intended result is asked, not guessed.
+- Existing authorization is reused within scope; missing authorization and explicit review checkpoints are respected.
+- A blocked step does not stop independent, authorized work; unanswered questions are not treated as approval.
+- A prompt-writing request produces a prompt without executing it.
 
-Use promptfoo for regression tests on prompt changes. With enough data and a metric, DSPy or GEPA can optimize the wording of SKILL.md. Tune the hook threshold (`PROMPT_CALIBRATOR_THRESHOLD`, default 3) against the over-asking and under-asking rates, and add each misclassified prompt to `tests/test_calibrate_gate.py`.
+These are rule-review cases, not measurements of model behavior. Hook unit tests check keyword scoring and output plumbing only.
+
+For an empirical evaluation, first define an authorized run budget and a task set covering clear requests, material ambiguities, low-risk assumptions, and approval boundaries. Compare the previous skill, the simplified skill, and no skill under the same model/version, tools, task inputs, and resource budgets. Record prompts, expected decisions, model settings, repetitions, traces, and costs so results are reproducible. Compare:
+
+- **Effectiveness:** task acceptance, wrong-target or out-of-scope actions, missed requirements, and explicit-checkpoint violations.
+- **Efficiency:** questions, user answer time, total time/tokens, and rework. Fewer questions alone is not success.
+- **Calibration:** unnecessary questions on clear tasks, consequential unasked gaps, and assumptions later overturned.
+
+Define task-specific success and failure conditions before running. Inspect failures and report uncertainty; a small scenario review cannot establish general performance. Evaluate the optional scout with a comparable resource budget. If hook thresholds are tuned later, retain misclassified prompts as regression cases and separate trigger accuracy from the downstream decision to ask. No such evaluation was run for this documentation change.
 
 ## 9. Limitations
 
-- Many 2026 results (UnderSpecBench, SWE-RPG, Ambig-DS, ASPI, SWE-chat) are arXiv preprints and not all are peer-reviewed. The figures here were checked against the arXiv abstracts; check the full papers before citing them elsewhere.
-- Asking thresholds depend heavily on the model. Claude models tend to spot underspecification more readily, while Codex models lean toward action. Evaluate the skill separately on each model you use.
-- The hook is a keyword heuristic with false positives and negatives. It only nudges; the skill makes the call.
-- "Ask in one round" conflicts with multi-turn requirement discovery. The `thorough` level is the compromise.
+- The retained source notes have not been independently reverified in this revision. Verify titles, authors, venue status, numerical results, and their experimental conditions against the linked primary sources before reuse.
+- The simplified workflow has no measured task-level advantage in this repository. Shorter instructions may omit useful detail; the review cases and empirical comparisons above should check that risk.
+- The hook remains a keyword heuristic with false positives and negatives. A reminder is not evidence that the task needs questions, and bypassing it does not authorize an action.
+- Asking quality and instruction compliance can vary by model and host tool. No current platform comparison is established here.
 
 ## References
 

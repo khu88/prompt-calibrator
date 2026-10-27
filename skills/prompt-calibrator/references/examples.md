@@ -1,107 +1,39 @@
 # Examples
 
-## 1. L1: fill gaps silently, ask nothing
+These are illustrative scenarios, not results from evaluated runs.
 
-**User:** "Add pagination to the /users endpoint."
+## 1. Clear complex work: proceed without questions
 
-**Grounding:** `src/orders/list.ts` already paginates with `page`/`pageSize` and returns `meta.total`; its tests are in `tests/orders.test.ts`.
+**User:** "Update pagination in the API and web client to the existing cursor format. Keep response fields compatible, use parallel agents if helpful, and run the relevant tests. Make local changes only."
 
-**Reply opens with:**
+**Available context:** Project documentation defines the cursor format; the affected endpoints and client callers are identifiable; existing tests cover compatibility.
 
-```
-L1.
-Understanding: add pagination to GET /users, following the /orders pattern.
-Assumptions: (1) page starts at 1, pageSize defaults to 20 with a max of 100, matching orders (2) response gains meta.total (3) 3 new tests: defaults, out of range, max size
-Verification: pnpm test
-Starting now. Correct anything above that's wrong.
-```
+**Response:** "I'll apply the documented cursor format to the API and its web callers, preserve the response fields, and verify compatibility with the relevant tests."
 
-Then it executes. It doesn't ask "offset or cursor?" because the repo has a precedent and the change is reversible.
+The agent reads the implementation, settles shared interfaces and file ownership, then proceeds within the local-change scope. Task size and parallel agents do not create a need for confirmation. A separate brief is unnecessary unless it helps the actual coordination.
 
-## 2. L2: full calibration
+## 2. A consequential correctness gap: ask and pause dependent work
 
-**User:** "Switch auth from sessions to JWT, frontend and backend. Feel free to run several agents in parallel."
+**User:** "Compare the two models on our dataset and report which one is better."
 
-**Grounding:** Express with Redis sessions; `web/` is React and `mobile/` is React Native, and both call the same API; 23 call sites read `req.session.user`.
+**Available context:** The project contains two evaluation splits, but neither the conversation nor the evaluation configuration identifies which split is authoritative for this comparison. The evaluation code is available.
 
-**Gap scan (excerpt):** done criteria partial; migration strategy missing, high impact; token storage missing, high impact; whether `mobile/` is in scope partial, high impact; naming conventions clear.
+**Question:** "Which evaluation split should define this comparison: A. the standard test split, or B. the out-of-domain split? They measure different generalization settings."
 
-**Questions (one round):**
+The agent does not choose a split or report a winner without an answer. It can inspect preprocessing and metric code while waiting. Any execution also remains subject to the user's resource and cost authorization. Once the missing conditions are resolved, it records the decision and continues without asking the user to reconfirm an identical brief.
 
-```
-Q1. How should signed-in users transition? (affects: whether a dual-stack period is needed, roughly 2x the work)
-  A. Accept both session and JWT for 2 weeks (recommended: no forced logout)
-  B. Force everyone to sign in again at launch
-  Default if unanswered: A
-Q2. Where should the frontend keep the token? (affects: XSS/CSRF defenses)
-  A. httpOnly cookie + CSRF token (recommended: matches the existing cookie setup)
-  B. In memory, with the refresh token in an httpOnly cookie
-  C. localStorage
-  Default if unanswered: A
-Q3. Is mobile/ in scope? (affects: number of subagents and the interface contract)
-  A. Yes, update it in the same change (recommended: it uses the same API)
-  B. No, just keep the API backward compatible
-  Default if unanswered: B
-Reply like "1A 2C 3B", or "go with the recommendations".
-```
+## 3. The user requests review before changes: respect the checkpoint
 
-After the answers, it writes the full brief (template §1) and splits the work: token issuing and validation (backend), web, mobile, and migration and rollback scripts. The main agent first fixes the shared contract serially (token format, refresh endpoint signature, error codes), then fans out. Every sub-brief carries "Decided: 2-week dual stack, httpOnly cookie". The user confirms the brief before execution starts.
+**User:** "Simplify this skill. First show me the plan; make changes only after I confirm."
 
-## 3. Irreversible operation: confirmation is mandatory
+**Response:** The agent reads the current files and presents concrete proposed edits, preserved behaviors, and verification steps. It identifies trade-offs and unresolved questions, if any.
 
-**User:** "Clean up the unused stuff on staging."
+The agent stops before editing, even if the edits would be reversible. After the user approves, it implements and verifies within the approved scope. Approval for local edits does not also authorize publication or a Git push.
 
-"Unused" and "clean up" are vague terms, and the action is irreversible with an uncertain target, so confirmation is required.
+## 4. Missing authorization: prepare what is allowed, pause the external action
 
-**Grounding (read-only):** 7 staging resources have had no traffic for 30 days and no owner tag.
+**User:** "Prepare this project for open source: fix the installation instructions and check the files for private information. Keep everything local until I approve publication."
 
-```
-Q1. These 7 resources look unused (no traffic for 30 days, no owner tag). What should happen to them?
-  [table: name / type / last active / monthly cost]
-  A. Snapshot or back up, then delete all 7 (recommended)
-  B. Delete only the first 4 (stateless compute) and keep the databases
-  C. Produce a dry-run report only; delete nothing
-  Default if unanswered: C
-```
+The agent makes the requested local edits, runs appropriate authorized checks, and presents the exact files and proposed publication destination for review. It does not create a public repository or push. If the user does not reply, publication remains paused; silence does not select a recommended option.
 
-The default is C, the safest option, not the recommended A. For irreversible actions the default is always the most conservative choice.
-
-## 4. Multi-agent research with budgeted delegation
-
-**User:** "Research the main vector databases and recommend one for us."
-
-**Grounding:** a Python service deployed on Kubernetes; data volume not stated.
-
-```
-Q1. What scale do you expect? (affects: the candidate list and what to benchmark)
-  A. Up to tens of millions of vectors (recommended: typical starting scale)
-  B. Hundreds of millions or more
-  Default if unanswered: A
-Q2. Deployment preference? (affects: whether fully managed services are included)
-  A. Compare self-hosted and managed (recommended)
-  B. Self-hostable only
-  Default if unanswered: A
-```
-
-**Done when:** a comparison of at most 2 pages covering latency, filtering, operating cost, license, and Kubernetes support, ending in a recommendation with reasons, and every claim linked to a source.
-
-**Delegation:** 2–4 subagents, since this is a comparison task. Each covers 1–2 candidates and returns the same JSON shape so the results merge cleanly. Boundary in every sub-brief: "Official docs and published benchmarks only; record the date of each source."
-
-## 5. Brief only: a refined prompt for another agent
-
-**User:** "Write me a prompt for Codex: add dark mode to the app."
-
-**Grounding:** React with Tailwind; `tailwind.config.js` has no `darkMode` setting; colors are hard-coded in about 40 components; no theme toggle exists.
-
-```
-Q1. What scope? (affects: number of files touched and whether colors become design tokens)
-  A. App-wide theme, with hard-coded colors replaced by tokens (recommended: avoids patching each component twice)
-  B. Dark styles only for the pages users see most, colors left as they are
-  Default if unanswered: A
-Q2. How is the theme chosen? (affects: the toggle UI and persistence)
-  A. Follow the system setting, with a manual override saved in localStorage (recommended)
-  B. Manual toggle only
-  Default if unanswered: A
-```
-
-**Output:** the pasteable prompt (template §3) wrapping a brief whose Done-when list includes "every page passes WCAG AA contrast in both themes" and "no hard-coded hex colors remain in src/components". Its Red lines include "no visual change in light mode". Nothing is executed.
+If the user later explicitly authorizes publication to that destination within the reviewed scope, the agent proceeds without requesting the same permission again. A different destination, additional sensitive content, or a materially expanded scope requires resolving that new gap first.

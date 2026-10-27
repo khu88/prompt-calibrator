@@ -109,10 +109,11 @@ def main():
         return 0
 
     note = (
-        "[prompt-calibrator] This request shows signs of {} (score {}). Unless it is clearly trivial (L0) "
-        "or continues a task already calibrated in this conversation, apply the prompt-calibrator skill "
-        "before acting: triage L0/L1/L2, ground in the project, ask at most 3 high-value questions "
-        "(always confirm irreversible targets), and state your assumptions or the Calibrated Brief."
+        "[prompt-calibrator] Signals: {} (score {}). Check context and existing decisions first. "
+        "Use prompt-calibrator when clarification is needed or requested; task size or multiple agents "
+        "alone do not require questions. Proceed within existing authorization, honor user checkpoints, "
+        "and ask only for necessary answers or missing approval. Silence is not authorization; pause "
+        "only dependent work."
     ).format(", ".join(hits), total)
     print(json.dumps({
         "hookSpecificOutput": {
